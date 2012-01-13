@@ -15,7 +15,7 @@ class Plugin(object):
         owner = self.owner
         if message == 'test':
             self.server.number_of_tests += 1
-            owner.send_broadcast( str( self.server.number_of_tests ) )
+            owner.send_sensor( 'number of tests', str( self.server.number_of_tests ) )
         else:
             print message
     
