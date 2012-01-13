@@ -22,9 +22,10 @@ class Server:
         self.server = None 
         self.threads = [] 
         self.plugins = ['test']
+        self.plugin_servers = {}
         for plugin in self.plugins:
             exec( 'from plugins import '+plugin )
-            exec("global "+plugin)
+            exec( 'self.plugin_servers['+plugin+'] = '+plugin+'.Server()' )
 
     def open_socket(self): 
         try: 
