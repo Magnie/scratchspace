@@ -12,10 +12,11 @@ class Plugin(object):
         self.server = server.plugin_servers['test']
     
     def broadcast(self, message):
-        owner = self.owner
+        owner = self.client
         if message == 'test':
             self.server.number_of_tests += 1
             owner.send_sensor( 'number of tests', str( self.server.number_of_tests ) )
+            owner.send_broadcast( "You have added a test." )
         else:
             print message
     

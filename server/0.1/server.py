@@ -24,8 +24,9 @@ class Server:
         self.plugins = ['test']
         self.plugin_servers = {}
         for plugin in self.plugins:
-            exec( 'from plugins import '+plugin )
-            exec( 'self.plugin_servers['+plugin+'] = '+plugin+'.Server()' )
+            exec( 'from plugins.'+plugin+' import Server' )
+            exec( 'self.plugin_servers["'+plugin+'"] = Server()' )
+        print self.plugin_servers
 
     def open_socket(self): 
         try: 
@@ -151,15 +152,20 @@ class Client(threading.Thread):
     
     def use_plugin(self, plugin): # Add plugin to client
         if plugin in s.plugins: # If it exists
-            s.plugins.append( plugin ) # Add it
-            exec( '''from plugins import '''+plugin+'''
+            try:
+                exec( 'reload( plugins.'+plugin+' )' )
+            except NameError:
+                s.plugins.append( plugin ) # Add it
+            
+                exec( '''from plugins import '''+plugin)
+            exec('''
 self.plugins[plugin] = '''+plugin+'''.Plugin(self, s) # Create the plugin class for this client
 ''')
             return 'Added plugin.'
         else: # Else, do nothing
             return 'No such plugin.'
     
-    def not_plugin(self, plugin):
+    def not_plugin(self, plugin): # Removes a plugin from the plugin list that the client uses.
         if plugin in self.plugins:
             del self.plugins[ plugin ]
             return 'Plugin removed.'
@@ -178,8 +184,8 @@ self.plugins[plugin] = '''+plugin+'''.Plugin(self, s) # Create the plugin class 
                 for plugin in self.plugins:
                     try:
                         self.plugins[plugin].broadcast( broadcast[1:] )
-                    except:
-                        print 'Error'
+                    except Exception, error:
+                        print str( error )
                         pass
         else: 
             self.client.close()
