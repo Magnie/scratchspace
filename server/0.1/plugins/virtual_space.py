@@ -2,11 +2,52 @@
 import threading
 import math
 
+# Server
 class Server(object):
     
     def __init__(self):
-        self.spaceships = []
+        self.universes = {}
+    
+    def assign(self, player):
+        for universe in self.universes:
+            universe = self.universes[universe]
+            if len( universe.players ) < universe.max_players:
+                universe.players.append( player )
+                return 'Added'
+        return 'No universe available.'
+    
+    def create_uni(self, name, max_players=12):
+        if name in self.universes:
+            return 'It already exists'
+        else:
+            self.universes[name] = Universe()
+            return 'Universe created.'
+    
+    def uni_exist(self, name):
+        if name in self.universes:
+            return True
+        else:
+            return False
 
+class Universe(object):
+
+    def __init__(self, max_players=12):
+        self.solar_systems = []
+        self.players = []
+        self.max_players = max_players
+
+class SolarSystem(object):
+    
+    def __init__(self):
+        pass
+
+class Planet(object):
+
+    def __init__(self):
+        pass
+
+        
+# Client
 class Plugin(object):
     
     def __init__(self, client, server):
@@ -38,6 +79,11 @@ class Spaceship(object):
         
         # Physics Engine
         self.physics = Physics(self)
+        
+        # Spaceship Controls
+        self.thrust_forward = 0
+        self.turn_left = 0
+        self.turn_right = 0
     
     def space_parse(self, message):
         message = message.split(' ')
@@ -47,9 +93,9 @@ class Spaceship(object):
         if request == 'name':
             self.name = args[0]
         elif request == 'forward':
-            self.forward = 1
+            self.thrust_forward = 1
         elif request == 'not forward':
-            self.forward = 0
+            self.thrust_forward = 0
 
 class Physics(threading.Thread):
     
@@ -68,7 +114,7 @@ class Physics(threading.Thread):
         
         self.inertia = 0
 
-        self.max_speed = 2
+        self.max_speed = 4
         self.min_speed = 0
         self.current_speed = 0
         
@@ -80,7 +126,7 @@ class Physics(threading.Thread):
             self.update_ship_pos()
     
     def update_controls(self):
-        if self.owner.move_forward == 1:
+        if self.owner.thrust_forward == 1:
             move_forward()
         if self.owner.turn_right == 1:
             turn_right()
@@ -95,6 +141,16 @@ class Physics(threading.Thread):
         if ( math.abs(temp_x_vel) + math.abs(temp_y_vel) ) < self.max_speed:
             self.xvel = temp_x_vel
             self.yvel = temp_y_vel
+    
+    def turn_left():
+        self.angle -= 1
+        if self.angle < 0:
+            self.angle += 360
+    
+    def turn_right():
+        self.angle += 1
+        if self.angle > 360:
+            self.angle -= 360
         
     def update_ship_pos(self):
         self.xpos += self.xvel
