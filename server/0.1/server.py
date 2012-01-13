@@ -21,8 +21,16 @@ class Server:
         self.size = 1024 
         self.server = None 
         self.threads = [] 
+        
+        # List of plugins to import.
         self.plugins = ['test']
+        
+        # This is used for the "servers" of the plugins
+        # for clients to communicate data with.
         self.plugin_servers = {}
+        
+        # This goes through all the plugins and creates
+        # creates the "servers" for them.
         for plugin in self.plugins:
             exec( 'from plugins.'+plugin+' import Server' )
             exec( 'self.plugin_servers["'+plugin+'"] = Server()' )
@@ -150,6 +158,11 @@ class Client(threading.Thread):
             del s.plugins[ plugin ]
             #exec( 'del '+plugin )
     
+    def reload_all_plugins(self):
+        for plugin in s.plugins:
+            exec( 'from plugins.'+plugin+' import Server' )
+            exec( 'self.plugin_servers["'+plugin+'"] = Server()' )
+    
     def use_plugin(self, plugin): # Add plugin to client
         if plugin in s.plugins: # If it exists
             try:
@@ -157,10 +170,8 @@ class Client(threading.Thread):
             except NameError:
                 s.plugins.append( plugin ) # Add it
             
-                exec( '''from plugins import '''+plugin)
-            exec('''
-self.plugins[plugin] = '''+plugin+'''.Plugin(self, s) # Create the plugin class for this client
-''')
+                exec( 'from plugins import '+plugin)
+            exec('self.plugins[plugin] = '+plugin+'.Plugin(self, s) # Create the plugin class for this client')
             return 'Added plugin.'
         else: # Else, do nothing
             return 'No such plugin.'
