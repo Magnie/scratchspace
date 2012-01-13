@@ -1,6 +1,7 @@
 # Virtual Space Plugin
 import threading
 import math
+import time
 
 # Server
 class Server(object):
@@ -35,6 +36,38 @@ class Universe(object):
         self.solar_systems = []
         self.players = []
         self.max_players = max_players
+
+class Universe_Updater(threading.Thread):
+    
+    def __init__(self, universe, update_speed=0.2):
+        threading.Thread.__init__(self)
+        self.universe = universe
+        self.update_speed = update_speed
+    
+    def run(self):
+        pass
+    
+    def update(self):
+        players_to_update = []
+        for player in self.universe.players:
+            players_to_update.append( [player.physics.xpos, player.physics.ypos, player.physics.angle, player.owner] )
+        
+        # Update each client with the locations of all the players.
+        for client in players_to_update:
+            con = client[3] # Connection
+            i = 0
+            for player in players_to_update:
+                pid = 'p'+str(i) # Player ID
+            
+                x = player[0] # X position
+                y = player[1] # Y position
+                d = player[2] # Direction
+            
+                # Send the location and player ID to the client.
+                con.update_sensor(pid+'x', str(x))
+                con.update_sensor(pid+'y', str(y))
+                con.update_sensor(pid+'d', str(d))
+                i += 1
 
 class SolarSystem(object):
     
@@ -84,6 +117,7 @@ class Spaceship(object):
         self.thrust_forward = 0
         self.turn_left = 0
         self.turn_right = 0
+        self.fire_shot = 0
     
     def space_parse(self, message):
         message = message.split(' ')
@@ -92,14 +126,29 @@ class Spaceship(object):
         del message
         if request == 'name':
             self.name = args[0]
-        elif request == 'forward':
+        elif request == 'forward true':
             self.thrust_forward = 1
-        elif request == 'not forward':
+        elif request == 'forward false':
             self.thrust_forward = 0
+        
+        elif request == 'left true':
+            self.turn_left = 1
+        elif request == 'left false':
+            self.turn_left = 0
+        
+        elif request == 'right true':
+            self.turn_right = 1
+        elif request == 'right false':
+            self.turn_right = 0
+        
+        elif request == 'shot true':
+            self.fire_shot = 1
+        elif request == 'shot false':
+            self.fire_shot = 0
 
 class Physics(threading.Thread):
     
-    def __init__(self, owner):
+    def __init__(self, owner, update_speed=0.2):
         threading.Thread.__init__(self)
         self.owner = owner
         
@@ -119,8 +168,26 @@ class Physics(threading.Thread):
         self.current_speed = 0
         
         self.alive = 1
+        
+        self.update_speed = update_speed
     
     def run(self):
+        if self.update_speed > 0:
+            self.updater_limited()
+        else:
+            self.updater_no_limit()
+    
+    def updater_limited(self):
+        last_update = time.time()
+        while self.alive:
+            current_time = time.time()
+            if current_time >= (last_update + self.update_speed):
+                self.update_controls()
+                self.update_ship_pos()
+                last_update = time.time()
+                current_time = time.time()
+    
+    def updater_no_limit(self):
         while self.alive:
             self.update_controls()
             self.update_ship_pos()
@@ -138,7 +205,7 @@ class Physics(threading.Thread):
         temp_x_vel = self.xvel + (math.sin( radians ) * self.accel)
         temp_y_vel = self.yvel + (math.cos( radians ) * self.accel)
         
-        if ( math.abs(temp_x_vel) + math.abs(temp_y_vel) ) < self.max_speed:
+        if ( math.abs(temp_x_vel) + math.abs(temp_y_vel) ) <= self.max_speed:
             self.xvel = temp_x_vel
             self.yvel = temp_y_vel
     
