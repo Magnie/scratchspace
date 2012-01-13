@@ -1,4 +1,11 @@
 # Test Plugin
+# This is an example plugin for the server.
+
+# What it does is ignore all messages except 'test'
+# and every time a client sends 'test' the count is
+# increased by one. Then it sends the amount of
+# tests that have been sent with a broadcast
+# 'You have added a test.' to the client.
 
 class Server(object):
     
