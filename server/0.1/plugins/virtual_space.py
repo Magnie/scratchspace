@@ -19,9 +19,10 @@ class Server(object):
             universe = self.universes[universe]
             for pid in universe.players:
                 player = universe.players[pid]
+                print pid, player
                 if player == None:
                     universe.add_player(pid, client)
-                    return universe, pid
+                    return 'Player added.'
         return 'No universe available.'
     
     def create_uni(self, name, max_players=12):
@@ -51,8 +52,12 @@ class Universe(object):
         # Settings
         self.max_players = max_players
         
+        # Create all the needed data.
         for player in xrange(0, self.max_players):
             self.players[str(player)] = None
+        
+        for i in xrange(0, 10):
+            self.solar_systems.append(SolarSystem(str(i)))
         
         # Universe Updater
         self.updater = UniverseUpdater(self)
@@ -63,6 +68,12 @@ class Universe(object):
     
     def add_player(self, pid, player):
         self.players[pid] = player
+        self.players[pid].universe = self
+        self.players[pid].solar_system = self.assign_solar_system(pid)
+        self.players[pid].player_id = pid
+        
+    def assign_solar_system(self, pid):
+        return self.solar_systems[0]
 
         
 class UniverseUpdater(threading.Thread):
@@ -88,33 +99,42 @@ class UniverseUpdater(threading.Thread):
         # Get the neccessary info and put it into a list
         for player in self.universe.players:
             player = self.universe.players[player]
-            players_to_update.append( [player.physics.xpos,
+            if player == None:
+                continue
+            players_to_update.append( [player.owner,
+                                        player.physics.xpos,
                                         player.physics.ypos,
                                         player.physics.angle,
-                                        player.owner] )
+                                        player.solar_system,
+                                        player.player_id] )
         
         # Update each client with the locations of all the players.
         for client in players_to_update:
-            con = client[3] # Connection
-            i = 0
+            con = client[0] # Connection
+            solar_system = client[4]
             for player in players_to_update:
-                pid = 'p'+str(i) # Player ID
+                
+                # Make sure the player is in the same solar system.
+                if player[4] != solar_system:
+                    continue
+                
+                pid = 'p'+player[5] # Player ID
             
-                x = player[0] # X position
-                y = player[1] # Y position
-                d = player[2] # Direction
+                x = player[1] # X position
+                y = player[2] # Y position
+                d = player[3] # Direction
             
                 # Send the location and player ID to the client.
-                con.update_sensor(pid+'x', str(x))
-                con.update_sensor(pid+'y', str(y))
-                con.update_sensor(pid+'d', str(d))
-                i += 1
+                con.send_sensor(pid+'x', str(x))
+                con.send_sensor(pid+'y', str(y))
+                con.send_sensor(pid+'d', str(d))
+
 
                 
 class SolarSystem(object):
     
-    def __init__(self):
-        pass
+    def __init__(self, name):
+        self.name = name
 
         
 class Planet(object):
@@ -136,7 +156,7 @@ class Plugin(object):
         self.spaceship = Spaceship(self)
         
         # Assign the spaceship/player to a universe and solar system.
-        self.universe, self.pid = self.virtual_space.assign(self.spaceship)
+        self.virtual_space.assign(self.spaceship)
     
     def broadcast(self, message):
         self.spaceship.space_parse(message)
@@ -145,7 +165,7 @@ class Plugin(object):
         pass
     
     def disconnect(self):
-        self.universe.del_player(self.pid)
+        self.spaceship.universe.del_player(self.pid)
         del self.spaceship.physics
     
     def send_broadcast(self, message):
@@ -163,6 +183,9 @@ class Spaceship(object):
         
         # Player Settings
         self.name = ''
+        self.universe = None
+        self.solar_system = None
+        self.player_id = None
         
         # Physics Engine
         self.physics = Physics(self)
@@ -172,41 +195,49 @@ class Spaceship(object):
         self.turn_left = 0
         self.turn_right = 0
         self.fire_shot = 0
+        
+        # Start up the physics
+        self.physics.start()
     
     def space_parse(self, message):
         message = message.split(' ')
         request = message[0]
         args = message[1:]
         del message
+        print request, args
         
         # Checks if the client wants to change their name.
         if request == 'name':
             self.name = args[0]
         
         # Checks if they want to move their ship forward.
-        elif request == 'forward true':
+        elif request == 'forward-true':
             self.thrust_forward = 1
         
-        elif request == 'forward false':
+        elif request == 'forward-false':
             self.thrust_forward = 0
         
         # Checks if they want to turn left.
-        elif request == 'left true':
+        elif request == 'left-true':
             self.turn_left = 1
-        elif request == 'left false':
+        elif request == 'left-false':
             self.turn_left = 0
         
         # Checks if they want to turn right.
-        elif request == 'right true':
+        elif request == 'right-true':
             self.turn_right = 1
-        elif request == 'right false':
+        elif request == 'right-false':
             self.turn_right = 0
         
         # Checks if they want to shoot a laser.
-        elif request == 'shot true':
+        elif request == 'shot-true':
             self.fire_shot = 1
-        elif request == 'shot false':
+        elif request == 'shot-false':
             self.fire_shot = 0
+        
+        # Any Other Utilities
+        elif request == 'player-id':
+            self.owner.send_sensor('pid', self.player_id)
 
             
 class Physics(threading.Thread):
@@ -263,27 +294,27 @@ class Physics(threading.Thread):
     def update_controls(self):
         # Update anything that needs updating.
         if self.owner.thrust_forward == 1:
-            move_forward()
+            self.move_forward()
         if self.owner.turn_right == 1:
-            turn_right()
+            self.turn_right()
         if self.owner.turn_left == 1:
-            turn_left()
+            self.turn_left()
     
     def move_forward(self):
         radians = (math.pi / 180) * self.angle
         temp_x_vel = self.xvel + (math.sin( radians ) * self.accel)
         temp_y_vel = self.yvel + (math.cos( radians ) * self.accel)
         
-        if ( math.abs(temp_x_vel) + math.abs(temp_y_vel) ) <= self.max_speed:
+        if (abs(temp_x_vel) + abs(temp_y_vel) ) <= self.max_speed:
             self.xvel = temp_x_vel
             self.yvel = temp_y_vel
     
-    def turn_left():
+    def turn_left(self):
         self.angle -= 1
         if self.angle < 0:
             self.angle += 360
     
-    def turn_right():
+    def turn_right(self):
         self.angle += 1
         if self.angle > 360:
             self.angle -= 360

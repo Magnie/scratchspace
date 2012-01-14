@@ -23,7 +23,7 @@ class Server:
         self.threads = [] 
         
         # List of plugins to import.
-        self.plugins = ['test']
+        self.plugins = ['test', 'virtual_space']
         
         # This is used for the "servers" of the plugins
         # for clients to communicate data with.
@@ -179,7 +179,8 @@ class Client(threading.Thread):
     def use_plugin(self, plugin): # Add plugin to client
         if plugin in s.plugins: # If it exists
             try:
-                exec( 'reload( plugins.'+plugin+' )' )
+                exec( 'reload( '+plugin+' )' )
+                self.plugins[plugin].disconnect()
             except NameError:
                 s.plugins.append( plugin ) # Add it
             
