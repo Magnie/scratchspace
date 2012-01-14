@@ -75,19 +75,28 @@ class Client(threading.Thread):
         running = 1 
         while running: 
             try:
-                data = self.client.recv(self.size) # Wait and receive data from client
-                data = self.parse_message(data) # Parse it
+                data = self.client.recv(self.size)
+                data = self.parse_message(data)
             except:
                 data = ''
             
             print data
             if data:
-                for broadcast in data['broadcast']: # For every broadcast, do_broadcast('broadcast')
+                # For every broadcast, do_broadcast('broadcast')
+                for broadcast in data['broadcast']:
                     self.do_broadcast( broadcast )
-            
-                for sensor in data['sensor-update']: # For every sensor-update, do_sensor('sensor', 'value')
+                
+                # For every sensor-update, do_sensor('sensor', 'value')
+                for sensor in data['sensor-update']:
                     self.do_sensor( sensor, data['sensor-update'][sensor] )
             else:
+                for plugin in self.plugins:
+                    try:
+                        self.plugins[plugin].disconnect()
+                    except Exception, error:
+                        print str( error )
+                        pass
+                del self.plugins
                 print self.address[0], 'has disconnected.'
                 self.client.close()
                 running = 0
@@ -104,10 +113,14 @@ class Client(threading.Thread):
 
             sensorupdates = re.search(sensorupdate_re, message)
             if sensorupdates:
+            
                 # formats string to '<sensor> <value> <sensor1> <value1> ...'
-                sensorupdates = sensorupdates.group().replace('sensor-update', '').strip().split()
-                # for sensors that are multiple words, make sure that entire sensor name
-                # shows up as one sensor value in the list
+                sensorupdates = sensorupdates.group()
+                sensorupdates = sensorupdates.replace('sensor-update', '')
+                sensorupdates = sensorupdates.strip().split()
+                
+                # for sensors that are multiple words, make sure that entire
+                # sensor name shows up as one sensor value in the list
                 i = 0
                 sensorlist = []
                 while i < len(sensorupdates):
@@ -171,12 +184,13 @@ class Client(threading.Thread):
                 s.plugins.append( plugin ) # Add it
             
                 exec( 'from plugins import '+plugin)
-            exec('self.plugins[plugin] = '+plugin+'.Plugin(self, s) # Create the plugin class for this client')
+            exec('self.plugins[plugin] = '+plugin+'.Plugin(self, s)')
             return 'Added plugin.'
         else: # Else, do nothing
             return 'No such plugin.'
     
-    def not_plugin(self, plugin): # Removes a plugin from the plugin list that the client uses.
+    def not_plugin(self, plugin): 
+        # Removes a plugin from the plugin list that the client uses.
         if plugin in self.plugins:
             del self.plugins[ plugin ]
             return 'Plugin removed.'
@@ -194,7 +208,7 @@ class Client(threading.Thread):
             elif broadcast[0] == ':': # Send to a plugin
                 for plugin in self.plugins:
                     try:
-                        self.plugins[plugin].broadcast( broadcast[1:] )
+                        self.plugins[plugin].broadcast(broadcast[1:])
                     except Exception, error:
                         print str( error )
                         pass
@@ -207,14 +221,17 @@ class Client(threading.Thread):
         return True
 
     def send_broadcast(self, value):
-        broadcast = self.sendScratchCommand( 'broadcast "'+value+'"' )
+        broadcast = self.sendScratchCommand('broadcast "'+value+'"')
         self.client.send( broadcast )
     
     def send_sensor(self, name, value):
-        sensor = self.sendScratchCommand( 'sensor-update "'+name+'" "'+value+'"' )
+        sensor = self.sendScratchCommand(
+                                        'sensor-update "'+name+'" "'+value+'"'
+                                        )
         self.client.send( sensor )
         
-    def sendScratchCommand(self, cmd): # I was never sure what this did, but it's required.
+    def sendScratchCommand(self, cmd):
+        # I was never sure what this did, but it's required.
         n = len(cmd)
         a = array('c')
         a.append(chr((n >> 24) & 0xFF))
