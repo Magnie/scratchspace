@@ -181,7 +181,9 @@ class Client(threading.Thread):
             try:
                 exec( 'reload( '+plugin+' )' )
                 self.plugins[plugin].disconnect()
-            except NameError:
+                del self.plugins[plugin]
+            except NameError or Exception, e:
+                print e
                 s.plugins.append( plugin ) # Add it
             
                 exec( 'from plugins import '+plugin)

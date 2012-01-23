@@ -101,6 +101,18 @@ class UniverseUpdater(threading.Thread):
             player = self.universe.players[player]
             if player == None:
                 continue
+            player.physics.update()
+    
+    def update_player(self, client):
+        players_to_update = []
+        con = client.owner
+        solar_system = client.solar_system
+        
+        # Get the neccessary info and put it into a list
+        for player in self.universe.players:
+            player = self.universe.players[player]
+            if player == None:
+                continue
             players_to_update.append( [player.owner,
                                         player.physics.xpos,
                                         player.physics.ypos,
@@ -108,27 +120,24 @@ class UniverseUpdater(threading.Thread):
                                         player.solar_system,
                                         player.player_id] )
         
+        #con.send_sensor('pid', str(player_id))
         # Update each client with the locations of all the players.
-        for client in players_to_update:
-            con = client[0] # Connection
-            solar_system = client[4]
-            for player in players_to_update:
+        for player in players_to_update:
+              
+            # Make sure the player is in the same solar system.
+            if player[4] != solar_system:
+                continue
                 
-                # Make sure the player is in the same solar system.
-                if player[4] != solar_system:
-                    continue
-                
-                pid = 'p'+player[5] # Player ID
+            pid = 'p'+player[5] # Player ID
             
-                x = player[1] # X position
-                y = player[2] # Y position
-                d = player[3] # Direction
+            x = player[1] # X position
+            y = player[2] # Y position
+            d = player[3] # Direction
             
-                # Send the location and player ID to the client.
-                con.send_sensor(pid+'x', str(x))
-                con.send_sensor(pid+'y', str(y))
-                con.send_sensor(pid+'d', str(d))
-
+            # Send the location and player ID to the client.
+            con.send_sensor(pid+'x', str(x))
+            con.send_sensor(pid+'y', str(y))
+            con.send_sensor(pid+'d', str(d))
 
                 
 class SolarSystem(object):
@@ -140,7 +149,8 @@ class SolarSystem(object):
 class Planet(object):
 
     def __init__(self):
-        pass
+        self.xpos = 0
+        self.ypos = 0
 
         
 # Client
@@ -165,7 +175,7 @@ class Plugin(object):
         pass
     
     def disconnect(self):
-        self.spaceship.universe.del_player(self.pid)
+        self.spaceship.universe.del_player(self.spaceship.player_id)
         del self.spaceship.physics
     
     def send_broadcast(self, message):
@@ -195,9 +205,6 @@ class Spaceship(object):
         self.turn_left = 0
         self.turn_right = 0
         self.fire_shot = 0
-        
-        # Start up the physics
-        self.physics.start()
     
     def space_parse(self, message):
         message = message.split(' ')
@@ -238,12 +245,15 @@ class Spaceship(object):
         # Any Other Utilities
         elif request == 'player-id':
             self.owner.send_sensor('pid', self.player_id)
+        
+        elif request == 'update':
+            self.universe.updater.update_player(self)
 
             
-class Physics(threading.Thread):
+class Physics(object): # class Physics(threading.Thread):
     
     def __init__(self, owner, update_speed=0.2):
-        threading.Thread.__init__(self)
+        #threading.Thread.__init__(self)
         self.owner = owner
         
         # Settings
@@ -275,6 +285,10 @@ class Physics(threading.Thread):
             self.updater_limited()
         else:
             self.updater_no_limit()
+    
+    def update(self):
+        self.update_controls()
+        self.update_ship_pos()
     
     def updater_limited(self):
         last_update = time.time()
