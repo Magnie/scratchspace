@@ -178,10 +178,11 @@ class Client(threading.Thread):
     
     def use_plugin(self, plugin): # Add plugin to client
         if plugin in s.plugins: # If it exists
-            try:
-                exec( 'reload( '+plugin+' )' )
+            if plugin in self.plugins:
                 self.plugins[plugin].disconnect()
                 del self.plugins[plugin]
+            try:
+                exec( 'reload( '+plugin+' )' )
             except NameError or Exception, e:
                 print e
                 s.plugins.append( plugin ) # Add it

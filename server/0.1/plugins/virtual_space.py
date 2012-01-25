@@ -120,7 +120,7 @@ class UniverseUpdater(threading.Thread):
                                         player.solar_system,
                                         player.player_id] )
         
-        #con.send_sensor('pid', str(player_id))
+        con.send_broadcast(str(len(players)*3))
         # Update each client with the locations of all the players.
         for player in players_to_update:
               
@@ -138,6 +138,7 @@ class UniverseUpdater(threading.Thread):
             con.send_sensor(pid+'x', str(x))
             con.send_sensor(pid+'y', str(y))
             con.send_sensor(pid+'d', str(d))
+        con.send_broadcast('~update')
 
                 
 class SolarSystem(object):
@@ -245,9 +246,18 @@ class Spaceship(object):
         # Any Other Utilities
         elif request == 'player-id':
             self.owner.send_sensor('pid', self.player_id)
+            self.owner.send_broadcast('~pid')
         
         elif request == 'update':
             self.universe.updater.update_player(self)
+        
+        elif request == 'get-vars':
+            counter = 0
+            for i in self.universe.players:
+                self.owner.send_sensor('p'+str(counter)+'x', '0')
+                self.owner.send_sensor('p'+str(counter)+'y', '0')
+                self.owner.send_sensor('p'+str(counter)+'d', '0')
+                counter += 1
 
             
 class Physics(object): # class Physics(threading.Thread):
@@ -268,6 +278,7 @@ class Physics(object): # class Physics(threading.Thread):
         self.inertia = 0
         self.max_speed = 4
         self.min_speed = 0
+        self.turn_speed = 4
         
         # Set the player as alive
         self.alive = 1
@@ -324,12 +335,12 @@ class Physics(object): # class Physics(threading.Thread):
             self.yvel = temp_y_vel
     
     def turn_left(self):
-        self.angle -= 1
+        self.angle -= self.turn_speed
         if self.angle < 0:
             self.angle += 360
     
     def turn_right(self):
-        self.angle += 1
+        self.angle += self.turn_speed
         if self.angle > 360:
             self.angle -= 360
         
