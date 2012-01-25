@@ -6,7 +6,6 @@ Entering any line of input at the terminal will exit the server.
 """ 
 
 from array import array
-import select 
 import socket 
 import sys 
 import threading 

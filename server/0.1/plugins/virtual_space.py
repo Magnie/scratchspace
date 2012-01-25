@@ -120,7 +120,6 @@ class UniverseUpdater(threading.Thread):
                                         player.solar_system,
                                         player.player_id] )
         
-        con.send_broadcast(str(len(players)*3))
         # Update each client with the locations of all the players.
         for player in players_to_update:
               
