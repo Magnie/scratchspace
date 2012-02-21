@@ -9,7 +9,6 @@ from array import array
 import socket 
 import sys 
 import threading 
-import json
 import re
 
 class Server: 
@@ -50,17 +49,29 @@ class Server:
         self.open_socket() # Open a socket so people can connect.
         running = 1
         id = 0 # To define each client.
-        while running:
-            id += 1 # Increase so no client has the same ID.
-            c = Client(self.server.accept()) # Waits for a client then accepts it.
-            print c.address[0], 'has connected.'
-            c.start() # Starts it.
-            self.threads.append(c) # Adds it to a list so the variable c and be used for the next client.
-
+        try:
+            while running:
+                id += 1 # Increase so no client has the same ID.
+                c = Client(self.server.accept()) # Waits for a client then accepts it.
+                print c.address[0], 'has connected.'
+                c.start() # Starts it.
+                self.threads.append(c) # Adds it to a list so the variable c and be used for the next client.
+        except KeyboardInterrupt:
+            pass
+        
+        for p in self.plugin_servers:
+            plugin_server = self.plugin_servers[p]
+            plugin_server.disconnect()
+            del self.plugin_servers[p]
+        del self.plugins
+        del self.plugin_servers
+        
         # Disconnect all clients.
         self.server.close() # Disconnect socket.
         for c in self.threads: # For each thread
             c.join() # End that thread.
+        del self.server
+        del self.threads
 
 class Client(threading.Thread): 
     def __init__(self,(client,address)): 
