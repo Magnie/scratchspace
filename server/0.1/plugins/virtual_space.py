@@ -48,6 +48,21 @@ class Universe(object):
         # Data
         self.solar_systems = []
         self.players = {}
+        self.weapons =  { 
+                            0 : {
+                                    'name' : 'Light Particle Blaster',
+                                    'type' : 0,
+                                    'shield_damage' : 3,
+                                    'armour_damage' : 3
+                                },
+                         
+                            1 : {
+                                    'name' : 'Beam Cannon',
+                                    'type' : 2,
+                                    'shield_damage' : 6,
+                                    'armour_damage' : 0
+                                }
+                        }
         
         # Settings
         self.max_players = max_players
@@ -118,7 +133,8 @@ class UniverseUpdater(threading.Thread):
                                         player.physics.ypos,
                                         player.physics.angle,
                                         player.solar_system,
-                                        player.player_id] )
+                                        player.player_id,
+                                        player.physics.visible] )
         
         # Update each client with the locations of all the players.
         for player in players_to_update:
@@ -132,11 +148,13 @@ class UniverseUpdater(threading.Thread):
             x = player[1] # X position
             y = player[2] # Y position
             d = player[3] # Direction
+            v = player[6] # Visible
             
             # Send the location and player ID to the client.
             con.send_sensor(pid+'x', str(x))
             con.send_sensor(pid+'y', str(y))
             con.send_sensor(pid+'d', str(d))
+            con.send_sensor(pid+'v', str(v))
         con.send_broadcast('~update')
 
                 
@@ -151,6 +169,8 @@ class Planet(object):
     def __init__(self):
         self.xpos = 0
         self.ypos = 0
+        self.name = 'N/A'
+        self.type = 0 # Any number.
 
         
 # Client
@@ -256,6 +276,7 @@ class Spaceship(object):
                 self.owner.send_sensor('p'+str(counter)+'x', '0')
                 self.owner.send_sensor('p'+str(counter)+'y', '0')
                 self.owner.send_sensor('p'+str(counter)+'d', '0')
+                self.owner.send_sensor('p'+str(counter)+'v', '0')
                 counter += 1
 
             
@@ -267,10 +288,12 @@ class Physics(object): # class Physics(threading.Thread):
         
         # Settings
         
-        # Location and direction of player
+        # Physical properties of the player and ship
         self.xpos = 0
         self.ypos = 0
         self.angle = 0
+        self.radians = (math.pi / 180) * self.angle
+        self.visible = 1 # Are they visible? 1 = True, 0 = False
         
         # Spaceship limitations
         self.accel = 0.1
@@ -289,6 +312,9 @@ class Physics(object): # class Physics(threading.Thread):
         self.xvel = 0
         self.yvel = 0
         self.current_speed = 0
+        
+        # Weapons
+        self.weapon = Weapon()
     
     def run(self):
         if self.update_speed > 0:
@@ -326,8 +352,8 @@ class Physics(object): # class Physics(threading.Thread):
     
     def move_forward(self):
         radians = (math.pi / 180) * self.angle
-        temp_x_vel = self.xvel + (math.sin( radians ) * self.accel)
-        temp_y_vel = self.yvel + (math.cos( radians ) * self.accel)
+        temp_x_vel = self.xvel + (math.sin( self.radians ) * self.accel)
+        temp_y_vel = self.yvel + (math.cos( self.radians ) * self.accel)
         
         if (abs(temp_x_vel) + abs(temp_y_vel) ) <= self.max_speed:
             self.xvel = temp_x_vel
@@ -337,12 +363,47 @@ class Physics(object): # class Physics(threading.Thread):
         self.angle -= self.turn_speed
         if self.angle < 0:
             self.angle += 360
+        self.radians = (math.pi / 180) * self.angle
     
     def turn_right(self):
         self.angle += self.turn_speed
         if self.angle > 360:
             self.angle -= 360
+        self.radians = (math.pi / 180) * self.angle
         
     def update_ship_pos(self):
+        self.xpos += self.xvel
+        self.ypos += self.yvel
+
+class Weapon(object):
+
+    def __init__(self):
+    
+        # Physical properties of the projectile.
+        self.xpos = 0
+        self.ypos = 0
+        self.angle = 0
+        self.radians = (math.pi / 180) * self.angle
+        self.visible = 1 # Is it visible? 1 = True, 0 = False
+        
+        # Alive?
+        self.alive = 1
+        
+        # Weapon Settings
+        self.costume = 0 # Any number (depending on the client)
+        self.type = 0 # 0 = Normal, 1 = Ignores Shields, 2 = Ignore Armour (can't destroy)
+        self.shield_damage = 0 # Any number
+        self.armour_damage = 0 # Any number
+    
+    def move_forward(self):
+        radians = (math.pi / 180) * self.angle
+        temp_x_vel = self.xvel + (math.sin( self.radians ) * self.accel)
+        temp_y_vel = self.yvel + (math.cos( self.radians ) * self.accel)
+        
+        if (abs(temp_x_vel) + abs(temp_y_vel) ) <= self.max_speed:
+            self.xvel = temp_x_vel
+            self.yvel = temp_y_vel
+    
+    def update_proj_pos(self):
         self.xpos += self.xvel
         self.ypos += self.yvel

@@ -6,9 +6,9 @@ Entering any line of input at the terminal will exit the server.
 """ 
 
 from array import array
-import socket 
-import sys 
-import threading 
+import socket
+import sys
+import threading
 import re
 
 class Server: 
@@ -171,7 +171,8 @@ class Client(threading.Thread):
         if plugin not in s.plugins:
             s.plugins.append( plugin )
             try:
-                reload( plugin )
+                tmp_plugin = getattr(__import__('plugins.' + plugin), plugin)
+                reload(tmp_plugin)
             except NameError:
                 exec( 'import '+plugin )
         
@@ -184,7 +185,7 @@ class Client(threading.Thread):
     def reload_all_plugins(self):
         for plugin in s.plugins:
             exec( 'from plugins.'+plugin+' import Server' )
-            exec( 'self.plugin_servers["'+plugin+'"] = Server()' )
+            exec( 's.plugin_servers["'+plugin+'"] = Server()' )
     
     def use_plugin(self, plugin): # Add plugin to client
         if plugin in s.plugins: # If it exists
@@ -192,13 +193,14 @@ class Client(threading.Thread):
                 self.plugins[plugin].disconnect()
                 del self.plugins[plugin]
             try:
-                exec( 'reload( '+plugin+' )' )
+                tmp_plugin = getattr(__import__('plugins.' + plugin), plugin)
+                reload(tmp_plugin)
             except NameError or Exception, e:
                 print e
                 s.plugins.append( plugin ) # Add it
             
-                exec( 'from plugins import '+plugin)
-            exec('self.plugins[plugin] = '+plugin+'.Plugin(self, s)')
+            exec( 'import plugins.'+plugin)
+            exec('self.plugins[plugin] = plugins.'+plugin+'.Plugin(self, s)')
             return 'Added plugin.'
         else: # Else, do nothing
             return 'No such plugin.'
