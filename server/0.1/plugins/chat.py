@@ -91,7 +91,7 @@ class Server(object):
         return room
 
     def leave(self, name):
-        del self.part_room(name, self.get_room(name))
+        self.part_room(name, self.get_room(name))
         del self.chat_users[name]
     
     def mute(self, muter, muted):
