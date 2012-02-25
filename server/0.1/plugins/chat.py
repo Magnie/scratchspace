@@ -25,11 +25,13 @@ class Server(object):
         self.chat_users = {} # 'username' : ['rank', 'room', user]
     
     def post_message(self, name, message):
-        room = self.chat_rooms[self.chat_users[name]]
-        rank = self.chat_users[name][0]
-        full_message = rank + name + ': ' + message
+        room = self.get_room(name)
+        rank = self.get_rank(name)
         
-        self.send_message(room, full_message)
+        if rank not in '#':
+            full_message = rank + name + ': ' + message
+        
+            self.send_message(room, full_message)
     
     def send_message(self, room, full_message):
         for user in room:
@@ -74,6 +76,10 @@ class Server(object):
             self.chat_users[name] = ['-', room, client]
             self.chat_rooms[room].append(name)
             return True
+    
+    def change_rank(self, name, new_rank):
+        room = self.get_room(name)
+        self.room_ranks[room][name] = new_rank
             
     def get_rank(self, name):
         room = self.get_room(name)
@@ -87,6 +93,11 @@ class Server(object):
     def leave(self, name):
         del self.part_room(name, self.get_room(name))
         del self.chat_users[name]
+    
+    def mute(self, muter, muted):
+        if self.get_rank(muter) is in "*~^@":
+            room = self.get_room(muter)
+            self.change_rank(muted, '#')
         
 # Client
 class Plugin(object):
@@ -128,6 +139,9 @@ class Plugin(object):
                 self.server.post_message(self.name, 'has joined!')
             else:
                 pass
+        
+        elif request == 'mute':
+            self.server.mute(args[0])
     
     def sensor(self, name, value):
         pass

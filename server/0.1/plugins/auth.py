@@ -12,7 +12,12 @@
 class Server(object):
     
     def __init__(self):
-        self.accounts = {} # 'username' : {'password' : 'password', 'rank' : 'rank', 'banned' : True/False}
+        self.accounts = {} # 'username' : {'password' : 'password',
+                           #               'rank' : 'rank',
+                           #               'banned' : True/False}
+        self.accounts['root'] = {'password' : 'root',
+                                 'rank' : '!@#$%^&*()_+=-[]{}|',
+                                 'banned' : False}
         self.active_users = {} # 'username' : class
     
     def login(self, username, password, _class):
@@ -39,7 +44,9 @@ class Server(object):
         except KeyError:
             pass
         
-        self.accounts[username] = {'password' : password, 'rank' : rank, 'banned' : False}
+        self.accounts[username] = {'password' : password,
+                                   'rank' : rank,
+                                   'banned' : False}
         return True
     
     def delete_account(self, username):
@@ -80,6 +87,16 @@ class Server(object):
             return True
         except KeyError:
             return False
+    
+    def load_accounts(self, filename):
+        acfile = open(filename, 'r')
+        self.accounts = cPickle.load(acfile)
+        acfile.close()
+    
+    def save_accounts(self, filename):
+        acfile = open(filename, 'w')
+        cPickle.dump(acfile, self.accounts)
+        acfile.close()
 
 # Client
 class Plugin(object):
