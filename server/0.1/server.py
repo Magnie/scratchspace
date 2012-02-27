@@ -21,7 +21,7 @@ class Server:
         self.threads = [] 
         
         # List of plugins to import.
-        self.plugins = ['test', 'virtual_space']
+        self.plugins = ['chat2']
         
         # This is used for the "servers" of the plugins
         # for clients to communicate data with.
@@ -87,7 +87,8 @@ class Client(threading.Thread):
             try:
                 data = self.client.recv(self.size)
                 data = self.parse_message(data)
-            except:
+            except Exception, e:
+                print e
                 data = ''
             
             print data
@@ -190,7 +191,10 @@ class Client(threading.Thread):
     def use_plugin(self, plugin): # Add plugin to client
         if plugin in s.plugins: # If it exists
             if plugin in self.plugins:
-                self.plugins[plugin].disconnect()
+                try:
+                    self.plugins[plugin].disconnect()
+                except Exception, e:
+                    print e
                 del self.plugins[plugin]
             try:
                 tmp_plugin = getattr(__import__('plugins.' + plugin), plugin)
