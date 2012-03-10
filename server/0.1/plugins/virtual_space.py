@@ -277,12 +277,18 @@ class Spaceship(object):
                 self.owner.send_sensor('p'+str(counter)+'y', '0')
                 self.owner.send_sensor('p'+str(counter)+'d', '0')
                 self.owner.send_sensor('p'+str(counter)+'v', '0')
+                
+                self.owner.send_sensor('w'+str(counter)+'x', '0')
+                self.owner.send_sensor('w'+str(counter)+'y', '0')
+                self.owner.send_sensor('w'+str(counter)+'d', '0')
+                self.owner.send_sensor('w'+str(counter)+'v', '0')
+                
                 counter += 1
 
             
 class Physics(object): # class Physics(threading.Thread):
     
-    def __init__(self, owner, update_speed=0.2):
+    def __init__(self, owner):
         #threading.Thread.__init__(self)
         self.owner = owner
         
@@ -305,9 +311,6 @@ class Physics(object): # class Physics(threading.Thread):
         # Set the player as alive
         self.alive = 1
         
-        # Update speed "limit"
-        self.update_speed = update_speed
-        
         # Physics
         self.xvel = 0
         self.yvel = 0
@@ -326,29 +329,19 @@ class Physics(object): # class Physics(threading.Thread):
         self.update_controls()
         self.update_ship_pos()
     
-    def updater_limited(self):
-        last_update = time.time()
-        while self.alive:
-            current_time = time.time()
-            if current_time >= (last_update + self.update_speed):
-                self.update_controls()
-                self.update_ship_pos()
-                last_update = time.time()
-                current_time = time.time()
-    
-    def updater_no_limit(self):
-        while self.alive:
-            self.update_controls()
-            self.update_ship_pos()
-    
     def update_controls(self):
         # Update anything that needs updating.
-        if self.owner.thrust_forward == 1:
+        if self.owner.thrust_forward:
             self.move_forward()
-        if self.owner.turn_right == 1:
+            
+        if self.owner.turn_right:
             self.turn_right()
-        if self.owner.turn_left == 1:
+            
+        if self.owner.turn_left:
             self.turn_left()
+            
+        if self.owner.fire_shot:
+            self.fire_shot()
     
     def move_forward(self):
         radians = (math.pi / 180) * self.angle
@@ -370,6 +363,15 @@ class Physics(object): # class Physics(threading.Thread):
         if self.angle > 360:
             self.angle -= 360
         self.radians = (math.pi / 180) * self.angle
+    
+    def fire_shot(self):
+        if not self.weapon.in_motion:
+            weapon = self.weapon
+            weapon.xpos = self.xpos
+            weapon.ypos = self.ypos
+            weapon.angle = self.angle
+            weapon.radians = self.radians
+            weapon.reset()
         
     def update_ship_pos(self):
         self.xpos += self.xvel
@@ -403,6 +405,23 @@ class Weapon(object):
         if (abs(temp_x_vel) + abs(temp_y_vel) ) <= self.max_speed:
             self.xvel = temp_x_vel
             self.yvel = temp_y_vel
+    
+    def collision_check(self, objects):
+        mask = [(self.xpos + 10),
+                (self.ypos + 10),
+                (self.xpos - 10),
+                (self.ypos - 10)]
+        
+        for object in objects:
+            if object.xpos <= mask[0] and object.xpos >= mask[2]:
+                if object.ypos <= mask[1] and object.ypos >= mask[3]:
+                    if object.weapon != self:
+                        object.collide()
+                        self.alive = 0
+                        break
+    
+    def reset(self):
+        self.alive = 1
     
     def update_proj_pos(self):
         self.xpos += self.xvel
