@@ -29,3 +29,7 @@ Change Log:
     Removed chat.py
 
     Added chat2.py which is an improved and heavily fixed version of chat.py
+
+1.3 - March 19, 2012
+    Updated chat2.py.
+    Updated virtual_space.py.
