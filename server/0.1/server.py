@@ -120,7 +120,7 @@ class Client(threading.Thread):
                     try:
                         self.plugins[plugin].disconnect()
                     except Exception, error:
-                        print str( error )
+                        print 'Error:', str( error )
                         pass
                 del self.plugins
                 print self.address[0], 'has disconnected.'
@@ -139,7 +139,7 @@ class Client(threading.Thread):
                 tmp_plugin = getattr(__import__('plugins.' + plugin), plugin)
                 reload(tmp_plugin)
             except NameError or Exception, e:
-                print e
+                print 'Error:', e
                 s.plugins.append( plugin ) # Add it
             
             exec( 'import plugins.'+plugin)
@@ -154,7 +154,7 @@ class Client(threading.Thread):
             try:
                 self.plugins[plugin].disconnect()
             except Exception, e:
-                print e
+                print 'Error:', e
             del self.plugins[plugin]
             return 'Plugin removed.'
         else:
@@ -173,7 +173,7 @@ class Client(threading.Thread):
                     try:
                         self.plugins[plugin].broadcast(broadcast[1:])
                     except Exception, error:
-                        print str( error )
+                        print 'Error:', error
                         pass
         else: 
             self.client.close()
