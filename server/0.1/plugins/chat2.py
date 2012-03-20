@@ -24,7 +24,9 @@ class Server(object):
         # 'room' : {'ranks' : {'user' : 'rank'},
         #           'users' : [],
         #           'flags' : 'flags'}
-        self.chat_rooms = { 'main' : {'ranks' : {}, 'users' : []} }
+        self.chat_rooms = { 'main' : {'ranks' : {},
+                                      'flags' : '',
+                                      'users' : []} }
         
         # 'username' : {'rank' : 'rank', 'hash' : 'hash'}
         self.chat_accounts = {'Magnie' : {'rank' : '*', 'hash' : ''}}
@@ -53,7 +55,7 @@ class Plugin(object):
             return
         self.cowner = client
         
-        # Other Settings
+        # Strings, etc
         self.messages = {
                 'auth_1' : '{0} has authenticated as {1}!',
                 'auth_0' : '{0} has failed to authenticated as {1}!',
@@ -65,6 +67,9 @@ class Plugin(object):
                 'part' : '{0} has parted {1}!',
                 'send' : '[{0}] {1} > {2}: {3}'
                 }
+        
+        self.bad_words = []
+        self.good_words = []
         
         # Set the "server" it's using.
         self.server = server.plugin_servers['chat2']
@@ -117,6 +122,9 @@ class Plugin(object):
         
         elif request == 'whisper' and len(args) > 1:
             self.user_message(args[0], ' '.join(args[1:]))
+        
+        elif request == 'flags' and len(args) == 1:
+            pass
     
     def sensor(self, name, value):
         pass
@@ -136,6 +144,18 @@ class Plugin(object):
     
     def switch_room(self, new_room):
         old_room = self.room
+        
+        if new_room not in self.server.chat_rooms:
+            if self.global_rank not in '*~':
+                return
+        
+        if '%' in self.server.chat_rooms[new_room]['flags']:
+            if self.global_rank not in '%~@^':
+                return
+        
+        if '~' in self.server.chat_rooms[new_room]['flags']:
+            if self.global_rank not in '~*':
+                return
         
         self.part_room(old_room)
         self.join_room(new_room)
@@ -228,6 +248,36 @@ class Plugin(object):
         print self.name, 'has disconnected!'
     
     def room_message(self, message):
+        if '+' in self.server.chat_rooms[self.room]['flags']:
+            if self.room_rank in '~*+%@^':
+                pass
+            else:
+                return
+        
+        if '%' in self.server.chat_rooms[self.room]['flags']:
+            if self.room_rank in '~*%@^':
+                pass
+            else:
+                return
+        
+        if '@' in self.server.chat_rooms[self.room]['flags']:
+            if self.room_rank in '~*@^':
+                pass
+            else:
+                return
+        
+        if '^' in self.server.chat_rooms[self.room]['flags']:
+            if self.room_rank in '~*^':
+                pass
+            else:
+                return
+        
+        censor = self.censor_message(message)
+        if censor:
+            message = censor
+        else:
+            return
+        
         name = self.name
         if self.room_rank not in '#':
             full_message = self.room_rank + name + ': ' + message
@@ -264,6 +314,40 @@ class Plugin(object):
                                                user,
                                                message)
     
+    def censor_message(self, raw_message):
+        flags = self.server.chat_rooms[self.room]['flags']
+        message = raw_message.split(' ')
+        
+        if '0' in flags:
+            for word in message:
+                if word in good_words:
+                    return raw_message
+            
+            return 0
+        
+        elif '1' in flags:
+            for bad_word in self.bad_words:
+                if bad_word in raw_message:
+                    return 0
+            return raw_message
+        
+        elif '2' in flags:
+            for word in message:
+                for bad_word in self.bad_words:
+                    if bad_word in word:
+                        if word not in self.good_words:
+                            return 0
+            return raw_message
+        
+        elif '3' in flags:
+            for bad_word in self.bad_words:
+                if bad_word in raw_message:
+                    raw_message = raw_message.replace(bad_word, '*')
+            return raw_message
+        
+        else:
+            return raw_message
+                
     def mute_user(self, name):
         if self.room_rank in '*~^@':
             if name in self.server.chat_rooms[self.room]['users']:
