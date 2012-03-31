@@ -2,7 +2,7 @@ Scratch Space and the plugins that come with it have been created by Magnie.
 You use the following at your own risk and I provide no warrenty to any damages
 from anything. If there are damages, bugs, problems, glitches, security problems,
 etc, please report them to MagnieTheReal@gmail.com so I can fix them. Please
-provide the any details and errors within the email. Thank you for using my plugin
+provide any/all details and errors within the email. Thank you for using my plugin
 server. :)
 
 Change Log:
@@ -33,3 +33,7 @@ Change Log:
 1.3 - March 19, 2012
     Updated chat2.py.
     Updated virtual_space.py.
+
+1.4 - March 31, 2012
+    Updated chat2.py.
+    Fixed grammar error in README.txt.
