@@ -16,6 +16,7 @@
 
 import urllib2 as urllib
 import hashlib
+import cPickle
 
 # Server
 class Server(object):
@@ -25,7 +26,7 @@ class Server(object):
         #           'users' : [],
         #           'flags' : 'flags'}
         self.chat_rooms = { 'main' : {'ranks' : {},
-                                      'flags' : '',
+                                      'flags' : '3',
                                       'users' : []} }
         
         # 'username' : {'rank' : 'rank', 'hash' : 'hash'}
@@ -41,9 +42,53 @@ class Server(object):
         self.guest_counter = 0
         
         # Other Settings
-        self.pre_salt = 'ABCHDasdfjCHdsaKGLs7984@W(&*$#245kjasdfjkh^%E(KJa*T$%EKJsdfnjdsflj#WREfd'
-        self.suf_salt = 'tNCJLSDfgjlaSLDFahsuiKUHF;fsdla(EAaw8e7uifj@#%(*sad87($#%WKJEfsd88793w24'
-        self.sec_salt = 'DJKSLAKSDIO329a8sdfjkh34%(*a786MV$V(Abidjlkjhtb4978Q$#*rn02qienQ#$(R#Qkj'
+        self.pre_salt = 'ABCHDasdfjCHdsaKGLs7984@W(&*$#245kjasdfjkh^\
+                        %E(KJa*T$%EKJsdfnjdsflj#WREfd'
+        
+        self.suf_salt = 'tNCJLSDfgjlaSLDFahsuiKUHF;fsdla(EAaw8e7uifj\
+                        @#%(*sad87($#%WKJEfsd88793w24'
+        
+        self.sec_salt = 'DJKSLAKSDIO329a8sdfjkh34%(*a786MV$V(Abidjlk\
+                        jhtb4978Q$#*rn02qienQ#$(R#Qkj'
+        
+        self.load_data()
+        self.save_data()
+    
+    def load_data(self):
+        try:
+            data_file = open('chat.data', 'r')
+            data = cPickle.load(data_file)
+            data_file.close()
+            
+            self.chat_rooms = data['chat_rooms']
+            self.chat_accounts = data['chat_accounts']
+            
+        except IOError, e:
+            print e
+    
+    def save_data(self):
+        try:
+            data = {}
+            data['chat_rooms'] = self.chat_rooms
+            data['chat_accounts'] = self.chat_accounts
+            
+            data_file = open('chat.data', 'w')
+            cPickle.dump(data, data_file)
+            data_file.close()
+            
+        except IOError, e:
+            print e
+    
+    def log(self, string):
+        try:
+            log_file = open("chat.log", 'a')
+            log_file.write('\n' + string)
+            log_file.close()
+        except IOError, e:
+            log_file = open("chat.log", 'w')
+            log_file.write(string)
+            log_file.close()
+        
     
 # Client
 class Plugin(object):
@@ -65,7 +110,9 @@ class Plugin(object):
                 'mute' : '{0} has muted {1}!',
                 'join' : '{0} has joined {1}!',
                 'part' : '{0} has parted {1}!',
-                'send' : '[{0}] {1} > {2}: {3}'
+                'send' : '[{0}] {1} > {2}: {3}',
+                
+                'flag' : 'Flags have been set to: {0}'
                 }
         
         self.bad_words = []
@@ -111,20 +158,26 @@ class Plugin(object):
         elif request == 'scratch-auth' and len(args) == 2:
             self.scratch_auth(args[0], args[1])
         
+        elif request == 'new-account' and leng(args) == 2:
+            self.new_account(args[0], args[1])
+        
         elif request == 'mute' and len(args) == 1:
             self.mute_user(args[0])
         
         elif request == 'force-kill' and len(args) == 1:
             self.force_kill(args[0])
         
-        elif request == 'user-list' and len(args) == 1:
+        elif request == 'user-list' and len(args) == 0:
             self.user_list()
         
         elif request == 'whisper' and len(args) > 1:
             self.user_message(args[0], ' '.join(args[1:]))
         
         elif request == 'flags' and len(args) == 1:
-            pass
+            self.set_flags(args[0])
+        
+        elif request == 'rank' and len(args) == 2:
+            self.change_room_rank(args[0], args[1])
     
     def sensor(self, name, value):
         pass
@@ -149,13 +202,16 @@ class Plugin(object):
             if self.global_rank not in '*~':
                 return
         
-        if '%' in self.server.chat_rooms[new_room]['flags']:
-            if self.global_rank not in '%~@^':
-                return
+        else:
+            if 'flags' not in self.server.chat_rooms[new_room]:
+                self.server.chat_rooms[new_room]['flags'] = '3'
+            if '%' in self.server.chat_rooms[new_room]['flags']:
+                if self.global_rank not in '%~@^':
+                    return
         
-        if '~' in self.server.chat_rooms[new_room]['flags']:
-            if self.global_rank not in '~*':
-                return
+            if '~' in self.server.chat_rooms[new_room]['flags']:
+                if self.global_rank not in '~*':
+                    return
         
         self.part_room(old_room)
         self.join_room(new_room)
@@ -173,27 +229,28 @@ class Plugin(object):
                                                 {
                                                 name : '^'
                                                 },
-                                            'users' : []
+                                            'users' : [],
+                                            'flags' : '3'
                                            }
             chat_room = self.server.chat_rooms[room]
             self.room_rank = chat_room['ranks'][name]
         
         chat_room['users'].append(name)
         self.room = room
-        self._message_room(self.room, name + ' has joined!')
+        self._message_room(self.room,
+                           self.messages['join'].format(name, room))
         print self.messages['join'].format(name, room)
     
     def part_room(self, old_room):
-        print 'parting'
         name = self.name
         old_chat_room = self.server.chat_rooms[old_room]
         if name in old_chat_room['users']:
-            print 'in room, removing'
             old_chat_room['users'].remove(name)
-            self._message_room(old_room, name + ' has left.')
-            print 'removed'
             
-            print self.messages['part'].format(name, old_room)
+            message = self.messages['part'].format(name, old_room)
+            self._message_room(old_room, message)
+            
+            print message
     
     def switch_name(self, new_name):
         chat_users = self.server.chat_users
@@ -207,19 +264,25 @@ class Plugin(object):
             del self.server.chat_users[old_name]
             self.server.chat_users[new_name] = self
             
-            self._message_room(self.room,
-                          old_name + ' renamed to ' + new_name)
+            message = self.messages['name'].format(old_name,
+                                                   new_name)
             
-            print self.messages['name'].format(old_name, new_name)
+            self._message_room(self.room, message)
+            
+            print message
     
     def scratch_auth(self, username, password):
         if scratch_authenticate(username, password):
             self.authenticated = True
-            self.global_rank = self.server.chat_accounts[username]['rank']
-            
-            print self.messages['auth_1'].format(self.name, username)
+            self.global_rank = self.server.chat_accounts[username]['\
+rank']
+            message = self.messages['auth_1'].format(self.name,
+                                                     username)
+            self._message_user(self.name, message)
         else:
-            print self.messages['auth_0'].format(self.name, username)
+            message = self.messages['auth_0'].format(self.name,
+                                                     username)
+            self._message_user(self.name, message)
     
     def auth(self, username, password):
         if username in self.server.chat_accounts:
@@ -230,17 +293,35 @@ class Plugin(object):
                 self._auth(username)
         
         if self.authenticated:
-            print self.messages['auth_1'].format(self.name, username)
+            message = self.messages['auth_1'].format(self.name,
+                                                     username)
+            self._message_user(self.name, message)
         else:
-            print self.messages['auth_0'].format(self.name, username)
+            message = self.messages['auth_0'].format(self.name,
+                                                     username)
+            self._message_user(self.name, message)
     
     def _auth(self, username):
         self.authenticated = True
         self.global_rank = self.server.chat_accounts[username][0]
     
+    def new_account(self, username, password):
+        password = self.hash(password)
+        if username in self.server.chat_accounts:
+            return
+        
+        chat_accounts = self.server.chat_accounts
+        chat_accounts[username] = {'rank' : '+', 'hash' : password}
+        
+        self.server.save_data()
+    
     def leave(self):
         try:
-            self.part_room(self.room)
+            for room in self.server.chat_rooms:
+                room = self.server.chat_rooms[room]
+                print room
+                if self.name in room['users']:
+                    self.part_room(room)
         except Exception, e:
             print e
         del self.server.chat_users[self.name]
@@ -248,19 +329,19 @@ class Plugin(object):
         print self.name, 'has disconnected!'
     
     def room_message(self, message):
-        if '+' in self.server.chat_rooms[self.room]['flags']:
+        if 'v' in self.server.chat_rooms[self.room]['flags']:
             if self.room_rank in '~*+%@^':
                 pass
             else:
                 return
         
-        if '%' in self.server.chat_rooms[self.room]['flags']:
+        if 's' in self.server.chat_rooms[self.room]['flags']:
             if self.room_rank in '~*%@^':
                 pass
             else:
                 return
         
-        if '@' in self.server.chat_rooms[self.room]['flags']:
+        if 'a' in self.server.chat_rooms[self.room]['flags']:
             if self.room_rank in '~*@^':
                 pass
             else:
@@ -284,16 +365,19 @@ class Plugin(object):
             self._message_room(self.room, full_message)
     
     def user_message(self, user, message):
-        if self.room_rank and self.global_rank not in '#':
+        if self.room_rank and self.global_rank not in '#!-+':
             full_message = self.name + ': ' + message
             self._message_user(user, message)
     
     def _message_room(self, room_name, message):
         room = self.server.chat_rooms[room_name]['users']
-        print self.messages['send'].format('0:0:0',
-                                               self.name,
-                                               room_name,
-                                               message)
+
+        self.server.log(self.messages['send'].format('0:0:0',
+                                                     self.name,
+                                                     room_name,
+                                                     message))
+        
+        print room
         
         for user in room:
             try:
@@ -304,15 +388,15 @@ class Plugin(object):
                 room.remove(user)
     
     def _message_user(self, user, message):
-        if user in self.chat_users:
+        if user in self.server.chat_users:
             user = self.server.chat_users[user]
             user.send_sensor('chat', message)
             user.send_broadcast('new_message')
             
-            print self.messages['send'].format('0:0:0',
-                                               self.name,
-                                               user,
-                                               message)
+            self.server.log(self.messages['send'].format('0:0:0',
+                                                         self.name,
+                                                         user,
+                                                         message))
     
     def censor_message(self, raw_message):
         flags = self.server.chat_rooms[self.room]['flags']
@@ -362,24 +446,38 @@ class Plugin(object):
             print self.messages['mute'].format(name, self.name)
     
     def change_room_rank(self, name, new_rank):
-        if self.room_rank in '*~^@':
+        if self.room_rank in '*~^@' or self.global_rank in '*~^@':
             chat_room = self.server.chat_rooms[self.room]
-            if self.room_rank == '*':
+            if self.room_rank == '*' or self.global_rank == '*':
                 chat_room['ranks'][name] = new_rank
             
-            elif self.room_rank == '~':
+            elif self.room_rank == '~' or self.global_rank == '~':
                 if new_rank in '^@+!#':
                     chat_room['ranks'][name] = new_rank
             
-            elif self.room_rank == '^':
+            elif self.room_rank == '^' or self.global_rank == '^':
                 if new_rank in '^@+!#':
                     chat_room['ranks'][name] = new_rank
             
-            elif self.room_rank == '@':
+            elif self.room_rank == '@' or self.global_rank == '@':
                 if new_rank in '+!#':
                     chat_room['ranks'][name] = new_rank
             
-            print self.messages['rank'].format(self.name, name, new_rank)
+            print self.messages['rank'].format(self.name,
+                                               name,
+                                               new_rank)
+            
+            self.server.save_data()
+    
+    def set_flags(self, flags):
+        if (self.room_rank and self.global_rank) not in '*~^@':
+            return
+        
+        self.server.chat_rooms[self.room]['flags'] = flags
+        self._message_room(self.room,
+                           self.messages['flag'].format(flags))
+        
+        self.server.save_data()
     
     def hash(self, hash):
         pre_salt = self.server.pre_salt
@@ -402,9 +500,10 @@ class Plugin(object):
     
     def user_list(self):
         message = ''
-        for user in self.server.chat_rooms['users']:
+        for user in self.server.chat_rooms[self.room]['users']:
             message += user + ', '
         message = message[:-1] + '.'
+        print message
         self._message_user(self.name, message)
 
 def scratch_authenticate(username, password):
