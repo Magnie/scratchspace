@@ -37,3 +37,6 @@ Change Log:
 1.4 - March 31, 2012
     Updated chat2.py.
     Fixed grammar error in README.txt.
+
+1.5 - April 9, 2012
+    Adding a lot of stuff to chat2.py.
