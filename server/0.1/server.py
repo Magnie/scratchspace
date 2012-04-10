@@ -33,7 +33,7 @@ class Server:
         for plugin in self.plugins:
             exec('from plugins.'+plugin+' import Server')
             exec('self.plugin_servers["'+plugin+'"] = Server()')
-        print self.plugin_servers
+        log(str(self.plugin_servers))
         
         # Banned IP list '0.0.0.0'
         self.banned_ips = []
@@ -47,7 +47,7 @@ class Server:
         except socket.error, (value,message): 
             if self.server: 
                 self.server.close() 
-            print "Could not open socket: " + message 
+            log("Could not open socket: " + str(message)) 
             sys.exit(1) 
 
     def run(self):
@@ -61,7 +61,7 @@ class Server:
                 
                 # Waits for a client then accepts it.
                 c = Client(self.server.accept())
-                print c.address[0], 'has connected.'
+                log(str(c.address[0]) + ' has connected.')
                 
                 if c.address[0] not in self.banned_ips:
                     c.start() # Starts it.
@@ -101,7 +101,7 @@ class Client(threading.Thread):
                 data = self.client.recv(self.size)
                 data = self.parse_message(data)
             except Exception, e:
-                print e
+                log(str(e))
                 data = ''
             
             #print data
@@ -120,10 +120,9 @@ class Client(threading.Thread):
                     try:
                         self.plugins[plugin].disconnect()
                     except Exception, error:
-                        print 'Error:', str( error )
-                        pass
+                        log('Error: ' + str( error ))
                 del self.plugins
-                print self.address[0], 'has disconnected.'
+                log(str(self.address[0]) + ' has disconnected.')
                 self.client.close()
                 running = 0
     
@@ -133,16 +132,16 @@ class Client(threading.Thread):
                 try:
                     self.plugins[plugin].disconnect()
                 except Exception, e:
-                    print e
+                    log(str(e))
                 del self.plugins[plugin]
             try:
                 tmp_plugin = getattr(__import__('plugins.' + plugin), plugin)
                 reload(tmp_plugin)
             except NameError or Exception, e:
-                print 'Error:', e
+                log('Error: ' + str(e))
                 s.plugins.append( plugin ) # Add it
             
-            exec( 'import plugins.'+plugin)
+            exec('import plugins.'+plugin)
             exec('self.plugins[plugin] = plugins.'+plugin+'.Plugin(self, s)')
             return 'Added plugin.'
         else: # Else, do nothing
@@ -154,7 +153,7 @@ class Client(threading.Thread):
             try:
                 self.plugins[plugin].disconnect()
             except Exception, e:
-                print 'Error:', e
+                log('Error: ' + str(e))
             del self.plugins[plugin]
             return 'Plugin removed.'
         else:
@@ -173,7 +172,7 @@ class Client(threading.Thread):
                     try:
                         self.plugins[plugin].broadcast(broadcast[1:])
                     except Exception, error:
-                        print 'Error:', error
+                        log('Error: ' + str(error))
                         pass
         else: 
             self.client.close()
@@ -181,17 +180,40 @@ class Client(threading.Thread):
         return True
     
     def do_sensor(self, name, value):
-        return True
+        pass
 
     def send_broadcast(self, value):
         broadcast = self.sendScratchCommand('broadcast "'+value+'"')
-        self.client.send( broadcast )
+        try:
+            self.client.send( broadcast )
+        except Exception, e:
+            log('Error: ' + str(e))
+            for plugin in self.plugins:
+                try:
+                    self.plugins[plugin].disconnect()
+                except Exception, error:
+                        log('Error: ' + str( error ))
+                del self.plugins
+                log(str(self.address[0]) + ' has disconnected.')
+                self.client.close()
     
     def send_sensor(self, name, value):
         sensor = self.sendScratchCommand(
                  'sensor-update "'+name+'" "'+value+'"'
                  )
-        self.client.send( sensor )
+        sensor = str(sensor)
+        try:
+            self.client.send(sensor)
+        except Exception, e:
+            log('Error: ' + str(e))
+            for plugin in self.plugins:
+                try:
+                    self.plugins[plugin].disconnect()
+                except Exception, error:
+                        log('Error: ' + str( error ))
+                del self.plugins
+                log(str(self.address[0]) + ' has disconnected.')
+                self.client.close()
     
     def parse_message(self, message):
         #TODO: parse sensorupdates with quotes in sensor names and values
@@ -278,6 +300,16 @@ class Client(threading.Thread):
         a.append(chr((n >>  8) & 0xFF))
         a.append(chr(n & 0xFF))
         return (a.tostring() + cmd)
+
+def log(string):
+    try:
+        log_file = open("server.log", 'a')
+        log_file.write('\n' + string)
+        log_file.close()
+    except IOError, e:
+        log_file = open("server.log", 'w')
+        log_file.write(string)
+        log_file.close()
 
 if __name__ == "__main__": 
     s = Server() 
